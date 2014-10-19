@@ -30,11 +30,11 @@
 
 /** \file
  *
- *  Main source file for the USBtoSerial project. This file contains the main tasks of
+ *  Main source file for the rpi_arduino project. This file contains the main tasks of
  *  the project and is responsible for the initial application hardware configuration.
  */
 
-#include "USBtoSerial.h"
+#include "rpi_arduino.h"
 #include <util/delay.h>
 #include <avr/sleep.h>
 

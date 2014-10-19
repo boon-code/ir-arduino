@@ -30,7 +30,7 @@
 
 /** \file
  *
- *  Header file for USBtoSerial.c.
+ *  Header file for rpi_arduino.c.
  */
 
 #ifndef _USB_SERIAL_H_
