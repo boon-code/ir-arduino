@@ -54,31 +54,26 @@ static uint8_t      USARTtoUSB_Buffer_Data[128];
  *  passed to all CDC Class driver functions, so that multiple instances of the same class
  *  within a device can be differentiated from one another.
  */
-USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface =
-	{
-		.Config =
-			{
-				.ControlInterfaceNumber         = INTERFACE_ID_CDC_CCI,
-				.DataINEndpoint                 =
-					{
-						.Address                = CDC_TX_EPADDR,
-						.Size                   = CDC_TXRX_EPSIZE,
-						.Banks                  = 1,
-					},
-				.DataOUTEndpoint                =
-					{
-						.Address                = CDC_RX_EPADDR,
-						.Size                   = CDC_TXRX_EPSIZE,
-						.Banks                  = 1,
-					},
-				.NotificationEndpoint           =
-					{
-						.Address                = CDC_NOTIFICATION_EPADDR,
-						.Size                   = CDC_NOTIFICATION_EPSIZE,
-						.Banks                  = 1,
-					},
-			},
-	};
+USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = {
+	.Config = {
+		.ControlInterfaceNumber = INTERFACE_ID_CDC_CCI,
+		.DataINEndpoint = {
+			.Address = CDC_TX_EPADDR,
+			.Size    = CDC_TXRX_EPSIZE,
+			.Banks   = 1,
+		},
+		.DataOUTEndpoint = {
+			.Address = CDC_RX_EPADDR,
+			.Size    = CDC_TXRX_EPSIZE,
+			.Banks   = 1,
+		},
+		.NotificationEndpoint = {
+			.Address = CDC_NOTIFICATION_EPADDR,
+			.Size    = CDC_NOTIFICATION_EPSIZE,
+			.Banks   = 1,
+		},
+	},
+};
 
 static uint8_t monitor_refresh = 1;
 static FILE usb_stream;
@@ -116,25 +111,6 @@ static volatile wdt_counter = 0;
 ISR(WDT_vect)
 {
 	++wdt_counter;
-
-	switch(wdt_counter) {
-	case 10:
-		LEDs_SetAllLEDs(LEDS_LED1);
-		break;
-	case 21:
-	case 31:
-	case 11:
-		LEDs_SetAllLEDs(0);
-		break;
-	case 20:
-		LEDs_SetAllLEDs(LEDS_LED2);
-		break;
-	case 30:
-		LEDs_SetAllLEDs(LEDS_LED3);
-		break;
-	default:
-		break;
-	}
 }
 
 #define WDT_CONFIG_MASK (_BV(WDIE) | _BV(WDE))
@@ -260,23 +236,51 @@ static void msr_update (void)
 	}
 }
 
+
+static volatile uint8_t s_power_irq = 0;
+
+ISR(PCINT0_vect)
+{
+	if ((PINB & (1 << 5)) == 0) {
+		/* PB5 Power Switch Interrupt */
+		s_power_irq = 1;
+	}
+
+	LEDs_SetAllLEDs(LEDS_LED3);
+}
+
 static void ctrl_monitor (USB_ClassInfo_CDC_Device_t *vdev)
 {
 	static uint8_t slave_reset = 0;
 	static uint8_t rpi_powered = 1;
+	static uint8_t led_powered = 0;
+	static uint8_t force_poweroff = 0;
 	int16_t rx_byte;
+
+	if (s_power_irq) {
+		s_power_irq = 0;
+		monitor_refresh = 1;
+		fprintf(&usb_stream, "Power Switch pressed!\r\n");
+	}
 
 	if (monitor_refresh) {
 		monitor_refresh = 0;
 		fprintf(&usb_stream, "\r\nMonitor\r\n=======\r\n"
-			"a) Reset slave: %s (A0)\r\n"
+                        " PBTN: %s, PST: %s\r\n"
+			"a) Reset slave (A0): %s\r\n"
 			"b) Enter bootloader\r\n"
-			"m) Measure mode: %s (A1)\r\n"
+			"m) Measure mode (A1): %s\r\n"
 			"s) Sleep\r\n"
-			"r) Rpi powered %s (D4)\r\n",
-			slave_reset ? "enabled" : "disabled",
+			"r) Rpi powered (D4): %s\r\n"
+                        "l) Led (D5): %s\r\n"
+                        "f) Force power-off (A2) %s\r\n",
+                        (PINB & (1 << 5)) == 0 ? "X" : "O",
+                        (PINB & (1 << 4)) == 0 ? "O" : "X",
+			slave_reset ? "high" : "low",
 			msr_is_started() ? "enabled" : "disabled",
-			rpi_powered ? "enabled" : "disabled");
+			rpi_powered ? "enabled" : "disabled",
+			led_powered ? "enabled" : "disabled",
+                        force_poweroff ? "force" : "no");
 	}
 
 	rx_byte = CDC_Device_ReceiveByte(vdev);
@@ -333,6 +337,30 @@ static void ctrl_monitor (USB_ClassInfo_CDC_Device_t *vdev)
 			} else {
 				rpi_powered = 0;
 				PORTD &= ~(1 << 4);
+			}
+			break;
+
+		case 'L':
+		case 'l':
+			if (led_powered == 0) {
+				led_powered = 1;
+				PORTC |= (1 << 6);
+				DDRC |= (1 << 6);
+			} else {
+				led_powered = 0;
+				DDRC &= ~(1 << 6);
+				PORTC &= ~(1 << 6);
+			}
+			break;
+
+		case 'F':
+		case 'f':
+			if (force_poweroff == 0) {
+				force_poweroff = 1;
+				DDRF |= (1 << 5);
+			} else {
+				force_poweroff = 0;
+				DDRF &= ~(1 << 5);
 			}
 			break;
 
@@ -425,8 +453,26 @@ void SetupHardware(void)
 	DDRF &= ~(1 << 6);
 	PORTF &= ~(1 << 7);
 
+	/* RPI Power Switch */
 	PORTD |= (1 << 4);
 	DDRD |= (1 << 4);
+
+	/* Power LED */
+	DDRC &= ~(1 << 6);
+	PORTC &= ~(1 << 6);
+
+        /* Power Switch Input and PLED input
+         * TODO: Disable PULL UP again!!
+         */
+	DDRB &= ~((1 << 5) || (1 << 4));
+	PORTB |= (1 << 5);
+	PCMSK0 |= (1 << 5); // PCINT5 (Power Switch IN)
+	PCMSK0 |= (1 << 4); // PCINT4 (PLED Status IN)
+	PCICR |= (1 << 0); // PCIE
+
+	/* RPI_SHTD (force power-off) */
+	DDRF &= ~(1 << 5);
+	PORTF &= ~(1 << 5);
 
 	/* Hardware Initialization */
 	LEDs_Init();
