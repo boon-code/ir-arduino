@@ -10,5 +10,5 @@
 
 void spi_init_master(void);
 void spi_shutdown(void);
-unsigned char spi_btransfer(const unsigned char data);
-unsigned short spi_wtransfer(const unsigned short data);
+uint8_t spi_btransfer(const uint8_t data);
+uint16_t spi_wtransfer(const uint16_t data);
