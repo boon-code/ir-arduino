@@ -2,6 +2,7 @@
 
 #include "ir_arduino.h"
 #include "monitor.h"
+#include "spi.h"
 
 
 static const char STR_CHOOSE_PGA1_ACTION[] PROGMEM = " Choose PGA1 action:\r\n  1) Toggle Zero Crossing Enabled\r\n  2) Toggle Mute\r\n  3) Toggle Chip Select\r\n  4) Pulse MOSI\r\n  5) Pulse SCLK\r\n  6) Read MISO\r\n  7) Set attenuation (Normal Operation)\r\n  e) Exit\r\n";
@@ -27,6 +28,17 @@ static const char STR_PGA_WAS_SET[] PROGMEM = "  pga has been set to (r, l) befo
 static const char STR_SEPERATOR[] PROGMEM = ", ";
 static const char STR_UNSUPPORTED[] PROGMEM = "  action unsupported\r\n";
 static const char STR_NL[] PROGMEM = "\r\n";
+
+static const char STR_DELETE_VALUE[] PROGMEM = "\r                  \r";
+
+
+static void usb_write_pstr(USB_ClassInfo_CDC_Device_t *vdev, const char *pstr);
+static void toggle(USB_ClassInfo_CDC_Device_t *vdev, uint8_t* value, const char* text);
+static void pga_cs(unsigned char select);
+static void write_to_pga(USB_ClassInfo_CDC_Device_t *vdev, const char *text);
+static unsigned char convert_hex_digit(unsigned char ch, unsigned char* out);
+static unsigned char is_number(unsigned char ch);
+unsigned char read_decimal(USB_ClassInfo_CDC_Device_t *vdev);
 
 
 static void usb_write_pstr(USB_ClassInfo_CDC_Device_t *vdev, const char *pstr)
@@ -58,10 +70,10 @@ static void toggle(USB_ClassInfo_CDC_Device_t *vdev, uint8_t* value, const char*
 	usb_write_pstr(vdev, text);
 	if (val) {
 		val = 0;
-		usb_write_pstr(STR_TOGGLE_DISABLE);
+		usb_write_pstr(vdev, STR_TOGGLE_DISABLE);
 	} else {
 		val = 1;
-		usb_write_pstr(STR_TOGGLE_ENABLE);
+		usb_write_pstr(vdev, STR_TOGGLE_ENABLE);
 	}
 	*value = val;
 }
@@ -77,7 +89,7 @@ static void pga_cs(unsigned char select)
 	_delay_us(1);
 }
 
-void write_to_pga(USB_ClassInfo_CDC_Device_t *vdev, const char *text)
+static void write_to_pga(USB_ClassInfo_CDC_Device_t *vdev, const char *text)
 {
 	uint8_t left = 0;
 	uint8_t right = 0;
@@ -87,30 +99,105 @@ void write_to_pga(USB_ClassInfo_CDC_Device_t *vdev, const char *text)
 
 	usb_write_pstr(vdev, text);
 	usb_write_pstr(vdev, STR_RIGHT);
-	right = read_decimal();
+	right = read_decimal(vdev);
 
 	usb_write_pstr(vdev, STR_NL);
 	usb_write_pstr(vdev, STR_LEFT);
-	left = read_decimal();
+	left = read_decimal(vdev);
 	
 	usb_write_pstr(vdev, STR_NL);
-	fprintf(usb_stream, "PGA Setup (r,l): %hhx, %hhx", right, left);
+	fprintf(&usb_stream, "PGA Setup (r,l): %hhx, %hhx", right, left);
 	
 	_delay_us(10);
 	pga_cs(1);
 	tx = (right << 8);
 	tx |= left;
 	tx = spi_wtransfer(tx);
-	switch_function(0);
+	pga_cs(0);
 	
 	usb_write_pstr(vdev, STR_NL);
 	
 	left = tx & 0xff;
 	right = (tx >> 8) & 0xff;
-	fprintf("PGA Setup before (r,l): %hhx, %hhx", right, left);
+	fprintf(&usb_stream, "PGA Setup before (r,l): %hhx, %hhx", right, left);
 	usb_write_pstr(vdev, STR_NL);
 	usb_write_pstr(vdev, STR_NL);
 }
+
+static unsigned char convert_hex_digit(unsigned char ch, unsigned char* out)
+{
+	if ((ch >= '0') && (ch <= '9')) {
+		*out = (ch - '0');
+		return 1;
+	} else if ((ch >= 'A') && (ch <= 'F')) {
+		*out = (ch - 'A') + 10;
+		return 1;
+	} else if ((ch >= 'a') && (ch <= 'f')) {
+		*out = (ch - 'a') + 10;
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+static unsigned char is_number(unsigned char ch)
+{
+	if ((ch >= '0') && (ch <= '9')) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+unsigned char read_decimal(USB_ClassInfo_CDC_Device_t *vdev)
+{
+	unsigned char chs[3];
+	unsigned char rx_index = 0;
+	unsigned int val = 0;
+	unsigned char no_ack = 1;
+
+	while (no_ack) {
+		unsigned char rx = (unsigned char)CDC_Device_ReceiveByte(vdev);
+
+		if ((rx == '\n') || (rx == '\r')) {
+			no_ack = 0;
+		} else if (is_number(rx)) {
+			switch (rx_index) {
+			case 0:
+			case 1:
+				chs[rx_index] = rx;
+				CDC_Device_SendByte(vdev, rx);
+				break;
+			case 2:
+				if ((val * 10 + (rx - '0')) <= 0xff) {
+					chs[rx_index] = rx;
+					CDC_Device_SendByte(vdev, rx);
+					break;
+				}
+			default:
+				--rx_index;
+			}
+			++rx_index;
+		} else if ((rx_index > 0) && ((rx == 8) || (rx == 0x7f))) {
+			chs[rx_index] = 0;
+			--rx_index;
+		} else if (rx == 0x1b) {
+			return 0;
+		}
+
+		usb_write_pstr(vdev, STR_DELETE_VALUE);
+		val = 0;
+		for(unsigned char i = 0; i < rx_index; ++i) {
+			unsigned char ch = chs[i];
+			CDC_Device_SendByte(vdev, ch);
+			val *= 10;
+			val += (ch - '0');
+		}
+	}
+
+	return (unsigned char) val;
+}
+
 void sub_pga(USB_ClassInfo_CDC_Device_t *vdev)
 {
 	uint8_t exit = 0x0;
@@ -120,7 +207,7 @@ void sub_pga(USB_ClassInfo_CDC_Device_t *vdev)
 
 	spi_init_master();
 
-	usb_write_pstr(STR_CHOOSE_PGA1_ACTION);
+	usb_write_pstr(vdev, STR_CHOOSE_PGA1_ACTION);
 
 	while(!exit) {
 		int16_t val;
@@ -146,11 +233,11 @@ void sub_pga(USB_ClassInfo_CDC_Device_t *vdev)
 		case '4':
 		case '5':
 		case '6':
-			usb_write_pstr(STR_UNSUPPORTED);
+			usb_write_pstr(vdev, STR_UNSUPPORTED);
 			break;
 
 		case '7':
-			write_to_pga(STR_PGA1_WRITE);
+			write_to_pga(vdev, STR_PGA1_WRITE);
 			break;
 
 		case 'e':
@@ -159,7 +246,7 @@ void sub_pga(USB_ClassInfo_CDC_Device_t *vdev)
 			break;
 
 		default:
-			uart_write_pstr(STR_CHOOSE_PGA1_ACTION);
+			usb_write_pstr(vdev, STR_CHOOSE_PGA1_ACTION);
 			break;
 		}
 	}
