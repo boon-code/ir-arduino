@@ -39,6 +39,7 @@
 #include "wdog_timer.h"
 #include "util.h"
 #include "pin_io.h"
+#include "monitor.h"
 
 #define IR_REF 3000
 #define IR_MAX 5000
@@ -241,7 +242,8 @@ int main(void)
 	ir_initialize();
 
 	while (1) {
-		ir_test_main();
+		sub_pga(&VirtualSerial_CDC_Interface);
+//		ir_test_main();
 	}
 }
 
