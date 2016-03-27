@@ -39,7 +39,18 @@ static void write_to_pga(USB_ClassInfo_CDC_Device_t *vdev, const char *text);
 static unsigned char convert_hex_digit(unsigned char ch, unsigned char* out);
 static unsigned char is_number(unsigned char ch);
 unsigned char read_decimal(USB_ClassInfo_CDC_Device_t *vdev);
+static unsigned char usb_getchar(USB_ClassInfo_CDC_Device_t *vdev);
 
+
+static unsigned char usb_getchar(USB_ClassInfo_CDC_Device_t *vdev)
+{
+	while (CDC_Device_BytesReceived(vdev) == 0) {
+		CDC_Device_USBTask(vdev);
+		USB_USBTask();
+	}
+
+	return CDC_Device_ReceiveByte(vdev);
+}
 
 static void usb_write_pstr(USB_ClassInfo_CDC_Device_t *vdev, const char *pstr)
 {
@@ -104,22 +115,26 @@ static void write_to_pga(USB_ClassInfo_CDC_Device_t *vdev, const char *text)
 	usb_write_pstr(vdev, STR_NL);
 	usb_write_pstr(vdev, STR_LEFT);
 	left = read_decimal(vdev);
-	
+
 	usb_write_pstr(vdev, STR_NL);
 	fprintf(&usb_stream, "PGA Setup (r,l): %hhx, %hhx", right, left);
-	
+	CDC_Device_USBTask(vdev);
+	USB_USBTask();
+
 	_delay_us(10);
 	pga_cs(1);
 	tx = (right << 8);
 	tx |= left;
 	tx = spi_wtransfer(tx);
 	pga_cs(0);
-	
+
 	usb_write_pstr(vdev, STR_NL);
-	
+
 	left = tx & 0xff;
 	right = (tx >> 8) & 0xff;
 	fprintf(&usb_stream, "PGA Setup before (r,l): %hhx, %hhx", right, left);
+	CDC_Device_USBTask(vdev);
+	USB_USBTask();
 	usb_write_pstr(vdev, STR_NL);
 	usb_write_pstr(vdev, STR_NL);
 }
@@ -157,7 +172,7 @@ unsigned char read_decimal(USB_ClassInfo_CDC_Device_t *vdev)
 	unsigned char no_ack = 1;
 
 	while (no_ack) {
-		unsigned char rx = (unsigned char)CDC_Device_ReceiveByte(vdev);
+		unsigned char rx = usb_getchar(vdev);
 
 		if ((rx == '\n') || (rx == '\r')) {
 			no_ack = 0;
@@ -185,6 +200,9 @@ unsigned char read_decimal(USB_ClassInfo_CDC_Device_t *vdev)
 			return 0;
 		}
 
+		CDC_Device_USBTask(vdev);
+		USB_USBTask();
+
 		usb_write_pstr(vdev, STR_DELETE_VALUE);
 		val = 0;
 		for(unsigned char i = 0; i < rx_index; ++i) {
@@ -205,8 +223,6 @@ void sub_pga(USB_ClassInfo_CDC_Device_t *vdev)
 	uint8_t mute = 0;
 	uint8_t cs = 1;
 
-	spi_init_master();
-
 	usb_write_pstr(vdev, STR_CHOOSE_PGA1_ACTION);
 
 	while(!exit) {
@@ -216,7 +232,7 @@ void sub_pga(USB_ClassInfo_CDC_Device_t *vdev)
 		PIN_SET_LEVEL(PGA_MUTE_NO, !mute);
 		PIN_SET_LEVEL(PGA_CS_NO, !cs);
 
-		val = CDC_Device_ReceiveByte(vdev);
+		val = usb_getchar(vdev);
 		switch(val) {
 		case '1':
 			toggle(vdev, &zcen, STR_ZCEN_TEXT);

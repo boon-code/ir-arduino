@@ -40,6 +40,7 @@
 #include "util.h"
 #include "pin_io.h"
 #include "monitor.h"
+#include "spi.h"
 
 #define IR_REF 3000
 #define IR_MAX 5000
@@ -260,14 +261,28 @@ void SetupHardware(void)
 	/* Disable clock division */
 	clock_prescale_set(clock_div_1);
 #endif
+	/* IR timer1 capture unit */
 	PIN_CLEAR(PIN_IR_I);
 	PIN_DIR_IN(PIN_IR_I);
 
+	/* IR external interrupt */
 	PIN_CLEAR(PIN_IR_WAKE_I);
 	PIN_DIR_IN(PIN_IR_WAKE_I);
 
+	/* IR debug pin */
 	PIN_CLEAR(PIN_DBG_O);
 	PIN_DIR_OUT(PIN_DBG_O);
+
+	/* PGA */
+	PIN_CLEAR(PGA_ZCEN_O);
+	PIN_SET(PGA_CS_NO);
+	PIN_SET(PGA_MUTE_NO);
+	PIN_DIR_OUT(PGA_ZCEN_O);
+	PIN_DIR_OUT(PGA_CS_NO);
+	PIN_DIR_OUT(PGA_MUTE_NO);
+
+	/* SPI */
+	spi_init_master();
 
 	/* Hardware Initialization */
 	LEDs_Init();
