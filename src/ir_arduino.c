@@ -83,6 +83,8 @@ USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = {
 	},
 };
 
+FILE usb_stream;
+
 #ifndef DEBUG_LEVEL
 # define DEBUG_LEVEL 1
 #endif
