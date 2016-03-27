@@ -54,6 +54,9 @@
 /** INT0: IR Wake (D3) */
 #define PIN_IR_WAKE_I(op)  PIN_MAKE(D,0,op)
 
+/** Debug output (D5) */
+#define PIN_DBG_O(op)      PIN_MAKE(C,6,op)
+
 /** LUFA CDC Class driver interface configuration and state information. This structure is
  *  passed to all CDC Class driver functions, so that multiple instances of the same class
  *  within a device can be differentiated from one another.
@@ -132,6 +135,11 @@ ISR(TIMER1_CAPT_vect)
 	if ((tmp > IR_MIN) && (tmp < IR_MAX)) {
 		g_ir.stamps[g_ir.received] = tmp;
 		++g_ir.received;
+		if (tmp > IR_REF) {
+			PIN_SET(PIN_DBG_O);
+		} else {
+			PIN_CLEAR(PIN_DBG_O);
+		}
 	}
 }
 
@@ -141,6 +149,9 @@ ISR(TIMER1_COMPA_vect)
 		g_ir.got_events = 1;
 		/* Disable CAPT & OVF */
 		TIMSK1 &= ~((1 << ICIE1) | (1 << OCIE1A));
+
+		/* DBG */
+		PIN_CLEAR(PIN_DBG_O);
 	}
 }
 
@@ -151,6 +162,9 @@ ISR(INT0_vect)
 	TIMSK1 |= (1 << ICIE1) | (1 << OCIE1A);
 	/* Disable INT0 */
 	EIMSK &= ~(1 << INT0);
+
+	/* DBG */
+	PIN_CLEAR(PIN_DBG_O);
 }
 
 static void ir_enable(void)
@@ -249,6 +263,9 @@ void SetupHardware(void)
 
 	PIN_CLEAR(PIN_IR_WAKE_I);
 	PIN_DIR_IN(PIN_IR_WAKE_I);
+
+	PIN_CLEAR(PIN_DBG_O);
+	PIN_DIR_OUT(PIN_DBG_O);
 
 	/* Hardware Initialization */
 	LEDs_Init();
