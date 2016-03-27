@@ -18,7 +18,13 @@ F_CPU        = 16000000
 F_USB        = $(F_CPU)
 OPTIMIZATION = s
 TARGET       = ir_arduino
-SRC          = $(TARGET).c Descriptors.c wdog_timer.c $(LUFA_SRC_USB) $(LUFA_SRC_USBCLASS)
+SRC          = $(TARGET).c \
+               spi.c \
+               monitor.c \
+               Descriptors.c \
+               wdog_timer.c \
+               $(LUFA_SRC_USB) \
+               $(LUFA_SRC_USBCLASS)
 LUFA_PATH    = ../../lufa/LUFA
 DLEVEL      ?= 0
 CC_FLAGS     = -DUSE_LUFA_CONFIG_HEADER -IConfig/ -DDEBUG_LEVEL=$(DLEVEL)
