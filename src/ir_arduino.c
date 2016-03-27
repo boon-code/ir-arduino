@@ -40,6 +40,10 @@
 #include "util.h"
 #include "pin_io.h"
 
+#define IR_REF 3000
+#define IR_MAX 5000
+#define IR_MIN 1000
+
 /*
  * Hardware configuration:
  */
@@ -113,49 +117,59 @@ static struct {
 	.code = {0, 0, 0, 0},
 };
 
-//static uint8_t g_ir_received = 0;
-//static uint8_t g_ir_got_events = 0;
-//static uint16_t g_ir_stamps[256];
-
 static void ir_test_main(void);
-static void ir_disable(void);
+static void ir_initialize(void);
 static void ir_enable(void);
+static uint8_t ir_evaluate(void);
 static void blink(uint8_t max);
 
 
 ISR(TIMER1_CAPT_vect)
 {
+	static uint16_t tmp = 0;
 	TCNT1 = 0x0000;
-	g_ir.stamps[g_ir.received] = ICR1;
-	++g_ir.received;
-}
-
-ISR(TIMER1_OVF_vect)
-{
-	if (g_ir.received > 0) {
-		g_ir.got_events = 1;
-		ir_disable();
+	tmp = ICR1;
+	if ((tmp > IR_MIN) && (tmp < IR_MAX)) {
+		g_ir.stamps[g_ir.received] = tmp;
+		++g_ir.received;
 	}
 }
 
-static void ir_disable(void)
+ISR(TIMER1_COMPA_vect)
 {
-	/* Disable CAPT */
-	TIMSK1 &= ~(1 << ICIE1);
+	if (g_ir.received > 0) {
+		g_ir.got_events = 1;
+		/* Disable CAPT & OVF */
+		TIMSK1 &= ~((1 << ICIE1) | (1 << OCIE1A));
+	}
+}
+
+ISR(INT0_vect)
+{
+	TCNT1 = 0x0000; /* Reset Timer */
+	/* Enable CAPT & OVF: */
+	TIMSK1 |= (1 << ICIE1) | (1 << OCIE1A);
+	/* Disable INT0 */
+	EIMSK &= ~(1 << INT0);
 }
 
 static void ir_enable(void)
 {
 	g_ir.received = 0;
 	g_ir.got_events = 0;
-	/* Enable CAPT: */
-	TIMSK1 = (1 << ICIE1) | (1 << TOIE1);
+	/* Enable INT0 */
+	EIMSK |= (1 << INT0);
 }
 
 static void ir_initialize(void)
 {
-	/*        filter=1      rising edge    clk/1 */
-	TCCR1B = (1 << ICNC1) | (1 << ICES1) | 0x1;
+	/* Enable Timer 1 unit:
+	 *         filter=1      falling edge    clk/8 */
+	TCCR1B = (1 << ICNC1) | (0 << ICES1) |   0x2;
+	/* Set TOP value for Timer 1 */
+	OCR1A = IR_MAX;
+	/* Enable INT0: 0x2 => falling edge; 0x3 => rising edge */
+	EICRA = 0x3;
 	ir_enable();
 }
 
@@ -172,7 +186,7 @@ static uint8_t ir_evaluate(void)
 	for (i = 0; i < 4; ++i) {
 		g_ir.code[i] = 0;
 		for (j = 0; j < 8; ++j) {
-			if (g_ir.stamps[index] > 25000) {
+			if (g_ir.stamps[index] > IR_REF) {
 				g_ir.code[i] |= (1 << j);
 			}
 			++index;
@@ -192,7 +206,7 @@ static void ir_test_main(void)
 		}
 		info("Processed %hhd stamps\r\n", g_ir.received);
 		if (ir_evaluate()) {
-			fprintf(&usb_stream, "%hhx%hhx%hhx%hhx\r\n", g_ir.code[0], g_ir.code[1], g_ir.code[2], g_ir.code[3]);
+			fprintf(&usb_stream, "%02hhx%02hhx%02hhx%02hhx\r\n", g_ir.code[0], g_ir.code[1], g_ir.code[2], g_ir.code[3]);
 		}
 		ir_enable();
 	}
