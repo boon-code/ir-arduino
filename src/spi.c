@@ -2,6 +2,8 @@
 
 #include "spi.h"
 
+#undef SPI_USE_CS
+
 #ifdef SPI_USE_CS
 # define spi_chip_select()   PIN_CLEAR(SPI_SS)
 # define spi_chip_release()  PIN_SET(SPI_SS)
@@ -16,9 +18,9 @@ void spi_init_master(void)
 
 #ifdef SPI_USE_CS
 	PIN_DIR_OUT(SPI_SS);
-#else /* Activate pull-ups to prevent multi-master detection */
-	PIN_DIR_IN(SPI_SS);
-	PIN_SET(SPI_SS);
+#else
+	PIN_DIR_OUT(SPI_SS);
+	PIN_CLEAR(SPI_SS);
 #endif
 	PIN_DIR_OUT(SPI_MOSI);
 	PIN_DIR_OUT(SPI_SCLK);
