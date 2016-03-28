@@ -110,7 +110,6 @@ FILE usb_stream;
 # error Debug level (DEBUG_LEVEL) is invalid (or not set)
 #endif
 
-
 static struct {
 	uint8_t received;
 	uint8_t got_events;
@@ -120,6 +119,14 @@ static struct {
 	.received = 0,
 	.got_events = 0,
 	.code = {0, 0, 0, 0},
+};
+
+static struct {
+	uint8_t volume;
+	uint8_t mute;
+} g_vol = {
+	.volume = 192, /* 0dB */
+	.mute = 1,
 };
 
 static void ir_test_main(void);
@@ -212,6 +219,92 @@ static uint8_t ir_evaluate(void)
 	return 1;
 }
 
+static uint8_t ir_iscode(const uint8_t code[4])
+{
+	for (uint8_t i = 0; i < 4; ++i) {
+		if (g_ir.code[i] != code[i]) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/*
+ - Lauter: a6590af5
+ - Leiser: a6590bf4
+ - Mute:   a45b1ee1
+ - Lautes Setting: a659d728
+ - Leises Setting: a659d827
+ - Aus: a659d827
+ - Ein: a6591ce3
+*/
+
+static void pga_ctrl(void)
+{
+	uint16_t tx = 0;
+	uint16_t rx = 0;
+
+	if (!g_vol.mute) {
+		tx = (g_vol.volume << 8) | g_vol.volume;
+	}
+	_delay_us(1);
+	PIN_CLEAR(PGA_CS_NO);
+	_delay_us(1);
+
+	rx = spi_wtransfer(tx);
+	info("SPI: send=%hx, receive=%hx\r\n", tx, rx);
+
+	_delay_us(1);
+	PIN_SET(PGA_CS_NO);
+	_delay_us(1);
+}
+
+static void ir_action(void)
+{
+	static const uint8_t vol_up[4]   = {0xa6, 0x59, 0x0a, 0xf5};
+	static const uint8_t vol_down[4] = {0xa6, 0x59, 0x0b, 0xf4};
+	static const uint8_t mute[4]     = {0xa4, 0x5b, 0x1e, 0xe1};
+	static const uint8_t loud[4]     = {0xa6, 0x59, 0xd7, 0x28};
+	static const uint8_t quiet[4]    = {0xa6, 0x59, 0xd8, 0x27};
+	static const uint8_t on[4]       = {0xa6, 0x59, 0xd8, 0x27};
+	static const uint8_t off[4]      = {0xa6, 0x59, 0x1c, 0xe3};
+	uint8_t change_pga = 1;
+
+	if (ir_iscode(vol_up)) {
+		if (g_vol.mute) {
+			g_vol.mute = 0;
+		} else {
+			if (g_vol.volume < 0xff) {
+				g_vol.volume += 1;
+			} /* else keep max. volume */
+		}
+	} else if (ir_iscode(vol_down)) {
+		if (g_vol.mute) {
+			g_vol.mute = 0;
+		} else if (g_vol.volume > 0) {
+			g_vol.volume -= 1;
+		} /* else keep minimum volume */
+	} else if (ir_iscode(mute)) {
+		g_vol.mute = 1;
+	} else if (ir_iscode(loud)) {
+		g_vol.mute = 0;
+		g_vol.volume = 192;
+	} else if (ir_iscode(quiet)) {
+		g_vol.mute = 0;
+		g_vol.volume = 150;
+	} else if (ir_iscode(on)) {
+		info("ON (unsupported)\r\n");
+	} else if (ir_iscode(off)) {
+		info("OFF (unsupported)\r\n");
+	} else {
+		change_pga = 0;
+	}
+
+	if (change_pga) {
+		pga_ctrl();
+	}
+}
+
 static void ir_test_main(void)
 {
 	if (g_ir.got_events) {
@@ -222,7 +315,8 @@ static void ir_test_main(void)
 		}
 		info("Processed %hhd stamps\r\n", g_ir.received);
 		if (ir_evaluate()) {
-			fprintf(&usb_stream, "%02hhx%02hhx%02hhx%02hhx\r\n", g_ir.code[0], g_ir.code[1], g_ir.code[2], g_ir.code[3]);
+			info("%02hhx%02hhx%02hhx%02hhx\r\n", g_ir.code[0], g_ir.code[1], g_ir.code[2], g_ir.code[3]);
+			ir_action();
 		}
 		ir_enable();
 	}
@@ -243,10 +337,10 @@ int main(void)
 	GlobalInterruptEnable();
 
 	ir_initialize();
+	pga_ctrl();
 
 	while (1) {
-		sub_pga(&VirtualSerial_CDC_Interface);
-//		ir_test_main();
+		ir_test_main();
 	}
 }
 
