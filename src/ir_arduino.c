@@ -59,6 +59,19 @@
 /** Debug output (D5) */
 #define PIN_DBG_O(op)      PIN_MAKE(C,6,op)
 
+/** Relay 1: Lower/Upper Jack */
+#define RLY1_LU(op)        PIN_MAKE(F,4,op)
+
+/** Relay 2: Extension/Default Input Jack */
+#define RLY2_ED(op)        PIN_MAKE(D,6,op)
+
+/** Relay 3: Passive/Active Input */
+#define RLY3_PA(op)        PIN_MAKE(B,7,op)
+
+/** Relay 4: Speaker/Headphones Output Jack */
+#define RLY4_SH(op)        PIN_MAKE(D,7,op)
+
+
 /** LUFA CDC Class driver interface configuration and state information. This structure is
  *  passed to all CDC Class driver functions, so that multiple instances of the same class
  *  within a device can be differentiated from one another.
@@ -344,6 +357,23 @@ int main(void)
 	}
 }
 
+static void relay_init(void)
+{
+	PIN_CLEAR(RLY1_LU);
+	PIN_CLEAR(RLY2_ED);
+	PIN_CLEAR(RLY3_PA);
+	PIN_CLEAR(RLY4_SH);
+
+	PIN_DIR_OUT(RLY1_LU);
+	PIN_DIR_OUT(RLY2_ED);
+	PIN_DIR_OUT(RLY3_PA);
+	PIN_DIR_OUT(RLY4_SH);
+
+	/* Default Setting (default input, active) */
+	PIN_SET(RLY2_ED);
+	PIN_SET(RLY3_PA);
+}
+
 /** Configures the board hardware and chip peripherals for the demo's functionality. */
 void SetupHardware(void)
 {
@@ -381,6 +411,8 @@ void SetupHardware(void)
 	/* Hardware Initialization */
 	LEDs_Init();
 	USB_Init();
+
+	relay_init();
 }
 
 /** Event handler for the library USB Connection event. */
