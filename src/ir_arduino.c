@@ -242,16 +242,6 @@ static uint8_t ir_iscode(const uint8_t code[4])
 	return 1;
 }
 
-/*
- - Lauter: a6590af5
- - Leiser: a6590bf4
- - Mute:   a45b1ee1
- - Lautes Setting: a659d728
- - Leises Setting: a659d827
- - Aus: a659d827
- - Ein: a6591ce3
-*/
-
 static void pga_ctrl(void)
 {
 	uint16_t tx = 0;
@@ -271,6 +261,16 @@ static void pga_ctrl(void)
 	PIN_SET(PGA_CS_NO);
 	_delay_us(1);
 }
+
+/*
+ - Lauter: a6590af5
+ - Leiser: a6590bf4
+ - Mute:   a45b1ee1
+ - Lautes Setting: a659d728
+ - Leises Setting: a659d827
+ - Aus: a659d827
+ - Ein: a6591ce3
+*/
 
 static void ir_action(void)
 {
