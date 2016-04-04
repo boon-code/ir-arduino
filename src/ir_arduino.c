@@ -139,7 +139,7 @@ static struct {
 	uint8_t mute;
 } g_vol = {
 	.volume = 192, /* 0dB */
-	.mute = 1,
+	.mute = 0,
 };
 
 static void ir_test_main(void);
