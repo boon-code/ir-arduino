@@ -142,11 +142,14 @@ static struct {
 	.mute = 0,
 };
 
+volatile uint16_t *bootKeyPtr = (volatile uint16_t *)0x0800;
+
 static void ir_test_main(void);
 static void ir_initialize(void);
 static void ir_enable(void);
 static uint8_t ir_evaluate(void);
 static void blink(uint8_t max);
+static void enter_bootloader(void);
 
 
 ISR(TIMER1_CAPT_vect)
@@ -335,6 +338,20 @@ static void ir_test_main(void)
 	}
 	CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
 	USB_USBTask();
+
+	if (CDC_Device_BytesReceived(&VirtualSerial_CDC_Interface)) {
+		int16_t key = CDC_Device_ReceiveByte(&VirtualSerial_CDC_Interface);
+
+		switch (key) {
+		case 'b':
+			relay_reset();
+			enter_bootloader();
+			break;
+		default:
+			info("Unsupported key: %hx\r\n", key);
+			break;
+		}
+	}
 }
 
 /** Main program entry point. This routine contains the overall program flow, including initial
@@ -465,6 +482,16 @@ void EVENT_USB_Device_WakeUp (void)
  */
 void EVENT_CDC_Device_LineEncodingChanged(USB_ClassInfo_CDC_Device_t* const CDCInterfaceInfo)
 {}
+
+static void enter_bootloader(void)
+{
+	cli();
+	MCUCR |= (1 << IVCE);
+	MCUCR = (1 << IVSEL);
+	bootKeyPtr[0] = 0x7777;
+	wdt_enable(WDTO_250MS);
+	while (1) { }
+}
 
 static void blink (uint8_t max)
 {
