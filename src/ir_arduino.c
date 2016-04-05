@@ -148,6 +148,8 @@ static void ir_test_main(void);
 static void ir_initialize(void);
 static void ir_enable(void);
 static uint8_t ir_evaluate(void);
+static void relay_reset(void);
+static void relay_init(void);
 static void blink(uint8_t max);
 static void enter_bootloader(void);
 
@@ -273,6 +275,10 @@ static void pga_ctrl(void)
  - Leises Setting: a659d827
  - Aus: a659d827
  - Ein: a6591ce3
+
+ - CH1: a6594cb3
+ - CH2: a6590ff0
+ - CH3: a65949b6
 */
 
 static void ir_action(void)
@@ -284,6 +290,9 @@ static void ir_action(void)
 	static const uint8_t quiet[4]    = {0xa6, 0x59, 0xd8, 0x27};
 	static const uint8_t on[4]       = {0xa6, 0x59, 0xd8, 0x27};
 	static const uint8_t off[4]      = {0xa6, 0x59, 0x1c, 0xe3};
+	static const uint8_t ch1[4]      = {0xa6, 0x59, 0x4c, 0xb3};
+	static const uint8_t ch2[4]      = {0xa6, 0x59, 0x0f, 0xf0};
+	static const uint8_t ch3[4]      = {0xa6, 0x59, 0x49, 0xb6};
 	uint8_t change_pga = 1;
 
 	if (ir_iscode(vol_up)) {
@@ -312,6 +321,18 @@ static void ir_action(void)
 		info("ON (unsupported)\r\n");
 	} else if (ir_iscode(off)) {
 		info("OFF (unsupported)\r\n");
+	} else if (ir_iscode(ch1)) { /* enable standard input */
+		PIN_SET(RLY3_PA); /* ensure we are in active mode */
+		PIN_SET(RLY2_ED);
+		PIN_CLEAR(RLY1_LU);
+	} else if (ir_iscode(ch2)) { /* enable lower extended input jack */
+		PIN_SET(RLY3_PA); /* ensure we are in active mode */
+		PIN_CLEAR(RLY1_LU);
+		PIN_CLEAR(RLY2_ED);
+	} else if (ir_iscode(ch3)) { /* enable upper extended input jack */
+		PIN_SET(RLY3_PA); /* ensure we are in active mode */
+		PIN_SET(RLY1_LU);
+		PIN_CLEAR(RLY2_ED);
 	} else {
 		change_pga = 0;
 	}
@@ -374,12 +395,17 @@ int main(void)
 	}
 }
 
-static void relay_init(void)
+static void relay_reset(void)
 {
 	PIN_CLEAR(RLY1_LU);
 	PIN_CLEAR(RLY2_ED);
 	PIN_CLEAR(RLY3_PA);
 	PIN_CLEAR(RLY4_SH);
+}
+
+static void relay_init(void)
+{
+	relay_reset();
 
 	PIN_DIR_OUT(RLY1_LU);
 	PIN_DIR_OUT(RLY2_ED);
