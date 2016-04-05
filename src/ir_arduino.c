@@ -486,12 +486,12 @@ void EVENT_USB_Device_ControlRequest(void)
 	CDC_Device_ProcessControlRequest(&VirtualSerial_CDC_Interface);
 }
 
-void EVENT_USB_Device_Suspend (void)
+void EVENT_USB_Device_Suspend(void)
 {
 	blink(2);
 }
 
-void EVENT_USB_Device_WakeUp (void)
+void EVENT_USB_Device_WakeUp(void)
 {
 	LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED2);
 }
@@ -519,7 +519,7 @@ static void enter_bootloader(void)
 	while (1) { }
 }
 
-static void blink (uint8_t max)
+static void blink(uint8_t max)
 {
 	uint8_t i;
 
