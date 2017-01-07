@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NORMAL_DEV=/dev/ttyEUSB
+NORMAL_DEV=/dev/ttyIRUSB
 BOOT_DEV=/dev/ttyARDUINO
 DEFAULT_BAUDRATE=19200
 
