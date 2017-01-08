@@ -1,0 +1,8 @@
+[PIONEER]
+ - Lauter: a6590af5
+ - Leiser: a6590bf4
+ - Mute:   a45b1ee1
+ - Lautes Setting: a659d728
+ - Leises Setting: a659d827
+ - Aus: a659d827
+ - Ein: a6591ce3

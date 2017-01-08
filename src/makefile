@@ -17,10 +17,17 @@ BOARD        = ARDUINO_MICRO
 F_CPU        = 16000000
 F_USB        = $(F_CPU)
 OPTIMIZATION = s
-TARGET       = rpi_arduino
-SRC          = $(TARGET).c Descriptors.c $(LUFA_SRC_USB) $(LUFA_SRC_USBCLASS)
+TARGET       = ir_arduino
+SRC          = $(TARGET).c \
+               spi.c \
+               monitor.c \
+               Descriptors.c \
+               wdog_timer.c \
+               $(LUFA_SRC_USB) \
+               $(LUFA_SRC_USBCLASS)
 LUFA_PATH    = ../../lufa/LUFA
-CC_FLAGS     = -DUSE_LUFA_CONFIG_HEADER -IConfig/
+DLEVEL      ?= 0
+CC_FLAGS     = -DUSE_LUFA_CONFIG_HEADER -IConfig/ -DDEBUG_LEVEL=$(DLEVEL)
 LD_FLAGS     = -Wl,-u,vfprintf -lprintf_flt -lm
 AVRDUDE_PROGRAMMER :=  avr109
 AVRDUDE_PORT       :=  /dev/ttyARDUINO
