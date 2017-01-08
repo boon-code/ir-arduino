@@ -152,6 +152,7 @@ static void relay_reset(void);
 static void relay_init(void);
 static void blink(uint8_t max);
 static void enter_bootloader(void);
+static void send_to_host(const uint8_t code[4]);
 
 
 ISR(TIMER1_CAPT_vect)
@@ -267,6 +268,19 @@ static void pga_ctrl(void)
 	_delay_us(1);
 }
 
+static void send_to_host(const uint8_t code[4])
+{
+	if (USB_DeviceState == DEVICE_STATE_Configured) {
+		fprintf( &usb_stream
+		       , "IR: %02hhx%02hhx%02hhx%02hhx#\r\n"
+		       , code[0]
+		       , code[1]
+		       , code[2]
+		       , code[3]
+		       );
+	}
+}
+
 /*
  - Lauter: a6590af5
  - Leiser: a6590bf4
@@ -354,6 +368,7 @@ static void ir_test_main(void)
 		if (ir_evaluate()) {
 			info("%02hhx%02hhx%02hhx%02hhx\r\n", g_ir.code[0], g_ir.code[1], g_ir.code[2], g_ir.code[3]);
 			ir_action();
+			send_to_host(g_ir.code);
 		}
 		ir_enable();
 	}
