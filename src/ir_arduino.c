@@ -428,6 +428,12 @@ static void ir_test_main(void)
 				pga_ctrl();
 			}
 			break;
+		case 'L':
+			if (g_vol.volume < 250) {
+				g_vol.volume += 6;
+				pga_ctrl();
+			}
+			break;
 		default:
 			info("Unsupported key: %hx\r\n", key);
 			break;
