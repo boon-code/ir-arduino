@@ -358,6 +358,8 @@ static void ir_action(void)
 
 static void ir_test_main(void)
 {
+	static uint8_t value = 0;
+
 	if (g_ir.got_events) {
 		for (uint8_t i = 0; i < g_ir.received; ++i) {
 			info("stamp [%hhu]: %hu\r\n", i, g_ir.stamps[i]);
@@ -382,6 +384,49 @@ static void ir_test_main(void)
 		case 'b':
 			relay_reset();
 			enter_bootloader();
+			break;
+		case 'v':
+			value = 0;
+			break;
+
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+		case '8':
+		case '9':
+			value *= 10;
+			value += (key - '0');
+			dbg("Value = %u\r\n", (unsigned int)value);
+			break;
+		case 'V':
+			if (g_vol.volume != value) {
+				g_vol.volume = value;
+				info("Set gain: %u\r\n", (unsigned int)value);
+				pga_ctrl();
+			}
+			break;
+		case 'i':
+			fprintf( &usb_stream
+			       , "Current gain: %u\r\n"
+			       , (unsigned int)g_vol.volume
+			       );
+			break;
+		case 'I':
+			fprintf( &usb_stream
+			       , "VOL:%u#\r\n"
+			       , (unsigned int)g_vol.volume
+			       );
+			break;
+		case 'Q':
+			if (g_vol.volume > 6) {
+				g_vol.volume -= 6;
+				pga_ctrl();
+			}
 			break;
 		default:
 			info("Unsupported key: %hx\r\n", key);
