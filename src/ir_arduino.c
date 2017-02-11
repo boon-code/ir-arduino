@@ -71,6 +71,9 @@
 /** Relay 4: Speaker/Headphones Output Jack */
 #define RLY4_SH(op)        PIN_MAKE(D,7,op)
 
+/** Power Relay 5: External power supply */
+#define RLY5_PWR(op)       PIN_MAKE(E,6,op)
+
 
 /** LUFA CDC Class driver interface configuration and state information. This structure is
  *  passed to all CDC Class driver functions, so that multiple instances of the same class
@@ -137,9 +140,11 @@ static struct {
 static struct {
 	uint8_t volume;
 	uint8_t mute;
+	uint8_t ext_power;
 } g_vol = {
 	.volume = 192, /* 0dB */
 	.mute = 0,
+	.ext_power = 0, /* external power relay [default: off] */
 };
 
 volatile uint16_t *bootKeyPtr = (volatile uint16_t *)0x0800;
@@ -434,6 +439,17 @@ static void ir_test_main(void)
 				pga_ctrl();
 			}
 			break;
+		case 'p':
+			if (g_vol.ext_power) {
+				info("Disable external Relay");
+				g_vol.ext_power = 0;
+				PIN_CLEAR(RLY5_PWR);
+			} else {
+				info("Enable external Relay");
+				g_vol.ext_power = 1;
+				PIN_SET(RLY5_PWR);
+			}
+			break;
 		default:
 			info("Unsupported key: %hx\r\n", key);
 			break;
@@ -467,6 +483,8 @@ static void relay_reset(void)
 	PIN_CLEAR(RLY2_ED);
 	PIN_CLEAR(RLY3_PA);
 	PIN_CLEAR(RLY4_SH);
+
+	PIN_CLEAR(RLY5_PWR);
 }
 
 static void relay_init(void)
@@ -477,6 +495,7 @@ static void relay_init(void)
 	PIN_DIR_OUT(RLY2_ED);
 	PIN_DIR_OUT(RLY3_PA);
 	PIN_DIR_OUT(RLY4_SH);
+	PIN_DIR_OUT(RLY5_PWR);
 
 	/* Default Setting (default input, active) */
 	PIN_SET(RLY2_ED);
