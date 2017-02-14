@@ -440,15 +440,14 @@ static void ir_test_main(void)
 			}
 			break;
 		case 'p':
-			if (g_vol.ext_power) {
-				info("Disable external Relay");
-				g_vol.ext_power = 0;
-				PIN_CLEAR(RLY5_PWR);
-			} else {
-				info("Enable external Relay");
-				g_vol.ext_power = 1;
-				PIN_SET(RLY5_PWR);
-			}
+			info("Disable external Relay");
+			g_vol.ext_power = 0;
+			PIN_CLEAR(RLY5_PWR);
+			break;
+		case 'P':
+			info("Enable external Relay");
+			g_vol.ext_power = 1;
+			PIN_SET(RLY5_PWR);
 			break;
 		default:
 			info("Unsupported key: %hx\r\n", key);
