@@ -34,13 +34,13 @@
  *  the project and is responsible for the initial application hardware configuration.
  */
 
-#include "ir_arduino.h"
 #include <util/delay.h>
-#include "wdog_timer.h"
 #include "util.h"
 #include "pin_io.h"
-#include "monitor.h"
 #include "spi.h"
+#include "wdog_timer.h"
+#include "ir_arduino.h"
+
 
 #define IR_REF 3000
 #define IR_MAX 5000
@@ -73,6 +73,15 @@
 
 /** Power Relay 5: External power supply */
 #define RLY5_PWR(op)       PIN_MAKE(E,6,op)
+
+/** PGA Zero Crossing Enable */
+#define PGA_ZCEN_O(op)     PIN_MAKE(B,6,op)
+
+/** Inverted Chip Select */
+#define PGA_CS_NO(op)      PIN_MAKE(B,5,op)
+
+/** Inverted mute */
+#define PGA_MUTE_NO(op)    PIN_MAKE(B,4,op)
 
 
 /** LUFA CDC Class driver interface configuration and state information. This structure is

@@ -20,7 +20,6 @@ OPTIMIZATION = s
 TARGET       = ir_arduino
 SRC          = $(TARGET).c \
                spi.c \
-               monitor.c \
                Descriptors.c \
                wdog_timer.c \
                $(LUFA_SRC_USB) \
