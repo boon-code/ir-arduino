@@ -43,13 +43,8 @@ static void clear_wdt_irq (void)
 	WDTCSR |= _BV(WDIF); /* clear irq */
 }
 
-extern void wd_tick (void);
-
 ISR(WDT_vect)
 {
-#if DEBUG_LEVEL == 2
-	wd_tick();
-#endif
 	if (wdt_state.counter == 0) {
 		wdt_config_locked(0, 0);
 		wdt_state.state = WDT_STATE_OFF;
